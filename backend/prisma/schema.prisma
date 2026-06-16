@@ -1,0 +1,677 @@
+// HRIS P1 Prototype — PostgreSQL schema
+// Domains: identity (User), RBAC (Role, UserRole), HR master (Employee, City),
+// approval workflow (UpdateRequest), immutable audit (ApprovalLog).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+/// P0 roles aligned with RBAC.md (Staff / HR / Admin).
+enum RoleCode {
+  STAFF
+  HR
+  ADMIN
+}
+
+/// How a role grant constrains data access (see RBAC.md scope model).
+enum DataScopeType {
+  GLOBAL
+  CITY
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  TERMINATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  DOMESTIC_PARTNERSHIP
+}
+
+/// Workflow terminal and in-flight states (WORKFLOW.md).
+enum UpdateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum UpdateRequestType {
+  PROFILE_UPDATE
+  SENSITIVE_FIELD_UPDATE
+}
+
+/// HRIS Phase 3 — domains that always require approval before applying.
+enum ApprovalChangeDomain {
+  PERSONAL_INFORMATION
+  CONTACT_INFORMATION
+  FAMILY_INFORMATION
+  PASSPORT_INFORMATION
+}
+
+/// Append-only approval audit actions.
+enum ApprovalAction {
+  SUBMIT
+  APPROVE
+  REJECT
+  CANCEL
+  COMMENT
+}
+
+/// Family member relationship to the RC (Religious Congregation) account worker.
+enum FamilyRelationship {
+  WORKER
+  SPOUSE
+  SON
+  DAUGHTER
+  PARENT
+}
+
+enum WorkerType {
+  FULL_TIME
+  PART_TIME
+  INTERN
+  VOLUNTEER
+  CONTRACT
+}
+
+enum WorkerStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+  TERMINATED
+}
+
+enum LanguageProficiency {
+  BASIC
+  CONVERSATIONAL
+  FLUENT
+  NATIVE
+}
+
+enum TrainingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+enum MarriageRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Immutable enterprise audit trail for data and workflow changes.
+enum AuditEntity {
+  EMPLOYEE_PROFILE
+  FAMILY
+  UPDATE_REQUEST
+}
+
+enum AuditAction {
+  UPDATE
+  SUBMIT
+  APPROVE
+  REJECT
+  CANCEL
+}
+
+// ---------------------------------------------------------------------------
+// User — authentication identity and privileged actor
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.Text
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  employee                 Employee?
+  userRoles                UserRole[]
+  assignedApprovalRequests UpdateRequest[] @relation("AssignedApprover")
+  approvalLogs             ApprovalLog[]
+  auditLogs                AuditLog[]
+  assignedRoleGrants       UserRole[]      @relation("RoleAssignedBy")
+  reviewedMarriageRequests MarriageRequest[] @relation("MarriageReviewer")
+
+  @@map("users")
+  @@index([status])
+  @@index([deletedAt])
+  @@index([status, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Role — RBAC role catalog (seed STAFF, HR, ADMIN)
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        RoleCode  @unique
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  isSystem    Boolean   @default(true) @map("is_system")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  userRoles UserRole[]
+
+  @@map("roles")
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// UserRole — user ↔ role grant with optional city scope (enterprise RBAC)
+// ---------------------------------------------------------------------------
+
+model UserRole {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  roleId           String        @map("role_id") @db.Uuid
+  scopeType        DataScopeType @default(GLOBAL) @map("scope_type")
+  /// Required when scopeType = CITY; null means global (Admin) scope.
+  cityId           String?       @map("city_id") @db.Uuid
+  assignedByUserId String?       @map("assigned_by_user_id") @db.Uuid
+  validFrom        DateTime      @default(now()) @map("valid_from") @db.Timestamptz(6)
+  validTo          DateTime?     @map("valid_to") @db.Timestamptz(6)
+  revokedAt        DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  city           City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  assignedByUser User? @relation("RoleAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("user_roles")
+  @@unique([userId, roleId, scopeType, cityId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([scopeType])
+  @@index([cityId])
+  @@index([assignedByUserId])
+  @@index([userId, revokedAt])
+  @@index([validFrom, validTo])
+}
+
+// ---------------------------------------------------------------------------
+// City — geographic scope for employees, RBAC, and approval routing
+// ---------------------------------------------------------------------------
+
+model City {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique @db.VarChar(20)
+  name        String    @db.VarChar(100)
+  countryCode String    @map("country_code") @db.Char(2)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  employees        Employee[]
+  userRoles        UserRole[]
+  updateRequests   UpdateRequest[]
+  marriageRequests MarriageRequest[]
+
+  @@map("cities")
+  @@index([countryCode])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@index([isActive, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Employee — HR master profile and reporting hierarchy
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id                String           @id @default(uuid()) @db.Uuid
+  employeeNo        String           @map("employee_no") @db.VarChar(50)
+  userId            String?          @unique @map("user_id") @db.Uuid
+  cityId            String           @map("city_id") @db.Uuid
+  managerEmployeeId String?          @map("manager_employee_id") @db.Uuid
+  firstName         String           @map("first_name") @db.VarChar(100)
+  lastName          String           @map("last_name") @db.VarChar(100)
+  workEmail         String?          @map("work_email") @db.VarChar(255)
+  phone             String?          @db.VarChar(30)
+  jobTitle          String?          @map("job_title") @db.VarChar(120)
+  department        String?          @db.VarChar(80)
+  gender            Gender?
+  maritalStatus     MaritalStatus?   @map("marital_status")
+  employmentStatus  EmploymentStatus @default(ACTIVE) @map("employment_status")
+  hireDate          DateTime?        @map("hire_date") @db.Date
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt         DateTime?        @map("deleted_at") @db.Timestamptz(6)
+
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  city          City            @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  manager       Employee?       @relation("EmployeeManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  directReports Employee[]      @relation("EmployeeManager")
+  requested     UpdateRequest[] @relation("RequestedByEmployee")
+  targets       UpdateRequest[] @relation("TargetEmployee")
+  familyMembers       FamilyMember[]
+  basicInfo           EmployeeBasicInfo?
+  contactInfo         EmployeeContactInfo?
+  workerInfo          EmployeeWorkerInfo?
+  teamAssignments     EmployeeTeamAssignment[]
+  educationRecords    EmployeeEducation[]
+  languageSkills      EmployeeLanguageSkill[]
+  passports           EmployeePassport[]
+  insuranceRecords    EmployeeInsurance[]
+  trainingAssignments      EmployeeTraining[]
+  marriageRequestsAsRequester MarriageRequest[] @relation("MarriageRequester")
+  marriageRequestsAsSpouse    MarriageRequest[] @relation("MarriageSpouse")
+
+  @@map("employees")
+  @@unique([employeeNo, deletedAt])
+  @@unique([workEmail, deletedAt])
+  @@index([cityId])
+  @@index([managerEmployeeId])
+  @@index([employmentStatus])
+  @@index([deletedAt])
+  @@index([cityId, employmentStatus, deletedAt])
+  @@index([lastName, firstName])
+}
+
+// ---------------------------------------------------------------------------
+// UpdateRequest — approval workflow header (sensitive field changes)
+// ---------------------------------------------------------------------------
+
+model UpdateRequest {
+  id                     String              @id @default(uuid()) @db.Uuid
+  requestNo              String              @unique @map("request_no") @db.VarChar(50)
+  requestType            UpdateRequestType   @default(PROFILE_UPDATE) @map("request_type")
+  changeDomain           ApprovalChangeDomain? @map("change_domain")
+  changeSummary          String?             @map("change_summary") @db.VarChar(200)
+  requesterEmployeeId    String              @map("requester_employee_id") @db.Uuid
+  targetEmployeeId       String              @map("target_employee_id") @db.Uuid
+  assignedApproverUserId String?             @map("assigned_approver_user_id") @db.Uuid
+  cityId                 String              @map("city_id") @db.Uuid
+  status                 UpdateRequestStatus @default(PENDING)
+  /// Optimistic concurrency for approve/reject transitions.
+  version                Int                 @default(0)
+  payloadBefore          Json?               @map("payload_before")
+  payloadAfter           Json                @map("payload_after")
+  rejectionReason        String?             @map("rejection_reason") @db.Text
+  submittedAt            DateTime?           @map("submitted_at") @db.Timestamptz(6)
+  resolvedAt             DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime?           @map("deleted_at") @db.Timestamptz(6)
+
+  requester        Employee      @relation("RequestedByEmployee", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+  targetEmployee   Employee      @relation("TargetEmployee", fields: [targetEmployeeId], references: [id], onDelete: Restrict)
+  assignedApprover User?         @relation("AssignedApprover", fields: [assignedApproverUserId], references: [id], onDelete: SetNull)
+  city             City          @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  approvalLogs     ApprovalLog[]
+
+  @@map("update_requests")
+  @@index([status, createdAt])
+  @@index([requesterEmployeeId])
+  @@index([targetEmployeeId])
+  @@index([assignedApproverUserId, status])
+  @@index([cityId, status])
+  @@index([deletedAt])
+  @@index([cityId, status, deletedAt])
+  @@index([changeDomain, status])
+  @@index([targetEmployeeId, changeDomain, status])
+}
+
+// ---------------------------------------------------------------------------
+// ApprovalLog — immutable workflow audit trail (append-only)
+// ---------------------------------------------------------------------------
+
+model ApprovalLog {
+  id              String               @id @default(uuid()) @db.Uuid
+  updateRequestId String               @map("update_request_id") @db.Uuid
+  actorUserId     String               @map("actor_user_id") @db.Uuid
+  action          ApprovalAction
+  fromStatus      UpdateRequestStatus? @map("from_status")
+  toStatus        UpdateRequestStatus? @map("to_status")
+  comment         String?              @db.Text
+  metadata        Json?
+  ipAddress       String?              @map("ip_address") @db.VarChar(45)
+  userAgent       String?              @map("user_agent") @db.VarChar(512)
+  correlationId   String?              @map("correlation_id") @db.VarChar(64)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  updateRequest UpdateRequest @relation(fields: [updateRequestId], references: [id], onDelete: Cascade)
+  actorUser     User          @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@map("approval_logs")
+  @@index([updateRequestId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([correlationId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Family — shared RC account grouping dependents with a worker employee
+// ---------------------------------------------------------------------------
+
+model Family {
+  id          String    @id @default(uuid()) @db.Uuid
+  /// Shared Religious Congregation account number for the household.
+  rcNumber    String    @unique @map("rc_number") @db.VarChar(30)
+  displayName String    @map("display_name") @db.VarChar(120)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  members FamilyMember[]
+
+  @@map("families")
+  @@index([deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// FamilyMember — person linked to a family RC account
+// ---------------------------------------------------------------------------
+
+model FamilyMember {
+  id               String             @id @default(uuid()) @db.Uuid
+  familyId         String             @map("family_id") @db.Uuid
+  /// Set when the member is an employee (required for WORKER relationship).
+  employeeId       String?            @unique @map("employee_id") @db.Uuid
+  relationshipType FamilyRelationship @map("relationship_type")
+  firstName        String             @map("first_name") @db.VarChar(100)
+  lastName         String             @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime?          @map("date_of_birth") @db.Date
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  family   Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@map("family_members")
+  @@index([familyId])
+  @@index([relationshipType])
+  @@index([deletedAt])
+  @@index([familyId, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Employee profile modules (Phase 2 — complete HRIS personal profile)
+// ---------------------------------------------------------------------------
+
+model EmployeeBasicInfo {
+  id            String         @id @default(uuid()) @db.Uuid
+  employeeId    String         @unique @map("employee_id") @db.Uuid
+  preferredName String?        @map("preferred_name") @db.VarChar(100)
+  dateOfBirth   DateTime?      @map("date_of_birth") @db.Date
+  citizenship   String?        @db.VarChar(80)
+  rcNumber      String?        @map("rc_number") @db.VarChar(30)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_basic_info")
+}
+
+model EmployeeContactInfo {
+  id                   String   @id @default(uuid()) @db.Uuid
+  employeeId           String   @unique @map("employee_id") @db.Uuid
+  primaryAddressLine1  String?  @map("primary_address_line1") @db.VarChar(200)
+  primaryAddressLine2  String?  @map("primary_address_line2") @db.VarChar(200)
+  primaryCity          String?  @map("primary_city") @db.VarChar(100)
+  primaryState         String?  @map("primary_state") @db.VarChar(80)
+  primaryPostalCode    String?  @map("primary_postal_code") @db.VarChar(20)
+  primaryCountry       String?  @map("primary_country") @db.VarChar(80)
+  mailingAddressLine1  String?  @map("mailing_address_line1") @db.VarChar(200)
+  mailingAddressLine2  String?  @map("mailing_address_line2") @db.VarChar(200)
+  mailingCity          String?  @map("mailing_city") @db.VarChar(100)
+  mailingState         String?  @map("mailing_state") @db.VarChar(80)
+  mailingPostalCode    String?  @map("mailing_postal_code") @db.VarChar(20)
+  mailingCountry       String?  @map("mailing_country") @db.VarChar(80)
+  phonePrimary         String?  @map("phone_primary") @db.VarChar(30)
+  phoneSecondary       String?  @map("phone_secondary") @db.VarChar(30)
+  emailPrimary         String?  @map("email_primary") @db.VarChar(255)
+  emailSecondary       String?  @map("email_secondary") @db.VarChar(255)
+  signalAccount        String?  @map("signal_account") @db.VarChar(120)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_contact_info")
+}
+
+model EmployeeWorkerInfo {
+  id               String        @id @default(uuid()) @db.Uuid
+  employeeId       String        @unique @map("employee_id") @db.Uuid
+  workerType       WorkerType?   @map("worker_type")
+  workerStatus     WorkerStatus? @map("worker_status")
+  internStartDate  DateTime?     @map("intern_start_date") @db.Date
+  ministryJoinDate DateTime?     @map("ministry_join_date") @db.Date
+  workerJoinDate   DateTime?     @map("worker_join_date") @db.Date
+  terminationDate  DateTime?     @map("termination_date") @db.Date
+  sendingRegion    String?       @map("sending_region") @db.VarChar(120)
+  salarySource     String?       @map("salary_source") @db.VarChar(120)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_worker_info")
+}
+
+model EmployeeTeamAssignment {
+  id         String    @id @default(uuid()) @db.Uuid
+  employeeId String    @map("employee_id") @db.Uuid
+  team       String    @db.VarChar(120)
+  position   String    @db.VarChar(120)
+  startDate  DateTime  @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_team_assignments")
+  @@index([employeeId])
+  @@index([employeeId, deletedAt])
+}
+
+model EmployeeEducation {
+  id             String    @id @default(uuid()) @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  degree         String    @db.VarChar(120)
+  major          String?   @db.VarChar(120)
+  school         String    @db.VarChar(200)
+  graduationYear Int?      @map("graduation_year")
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_education")
+  @@index([employeeId])
+  @@index([employeeId, deletedAt])
+}
+
+model EmployeeLanguageSkill {
+  id           String              @id @default(uuid()) @db.Uuid
+  employeeId   String              @map("employee_id") @db.Uuid
+  language     String              @db.VarChar(80)
+  proficiency  LanguageProficiency
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?           @map("deleted_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_language_skills")
+  @@index([employeeId])
+  @@index([employeeId, deletedAt])
+}
+
+model EmployeePassport {
+  id             String    @id @default(uuid()) @db.Uuid
+  employeeId     String    @map("employee_id") @db.Uuid
+  passportNumber String    @map("passport_number") @db.VarChar(50)
+  country        String    @db.VarChar(80)
+  issueDate      DateTime? @map("issue_date") @db.Date
+  expiryDate     DateTime? @map("expiry_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_passports")
+  @@index([employeeId])
+  @@index([employeeId, deletedAt])
+}
+
+model EmployeeInsurance {
+  id               String    @id @default(uuid()) @db.Uuid
+  employeeId       String    @map("employee_id") @db.Uuid
+  insuranceProvider String   @map("insurance_provider") @db.VarChar(120)
+  policyNumber     String    @map("policy_number") @db.VarChar(80)
+  effectiveDate    DateTime? @map("effective_date") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_insurance")
+  @@index([employeeId])
+  @@index([employeeId, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Training — course catalog and employee completion records
+// ---------------------------------------------------------------------------
+
+model Training {
+  id        String    @id @default(uuid()) @db.Uuid
+  code      String    @unique @db.VarChar(50)
+  title     String    @db.VarChar(200)
+  category  String    @db.VarChar(80)
+  provider  String    @db.VarChar(120)
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignments EmployeeTraining[]
+
+  @@map("trainings")
+  @@index([category])
+}
+
+model EmployeeTraining {
+  id             String         @id @default(uuid()) @db.Uuid
+  employeeId     String         @map("employee_id") @db.Uuid
+  trainingId     String         @map("training_id") @db.Uuid
+  completionDate DateTime?      @map("completion_date") @db.Date
+  status         TrainingStatus @default(NOT_STARTED)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  training Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@map("employee_trainings")
+  @@unique([employeeId, trainingId])
+  @@index([employeeId])
+  @@index([trainingId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// MarriageRequest — employee marriage workflow (family account merge)
+// ---------------------------------------------------------------------------
+
+model MarriageRequest {
+  id                  String                @id @default(uuid()) @db.Uuid
+  requestNo           String                @unique @map("request_no") @db.VarChar(50)
+  requesterEmployeeId String                @map("requester_employee_id") @db.Uuid
+  spouseEmployeeId    String                @map("spouse_employee_id") @db.Uuid
+  cityId              String                @map("city_id") @db.Uuid
+  status              MarriageRequestStatus @default(PENDING)
+  rejectionReason     String?               @map("rejection_reason") @db.Text
+  reviewedByUserId    String?               @map("reviewed_by_user_id") @db.Uuid
+  submittedAt         DateTime              @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  approvedAt          DateTime?             @map("approved_at") @db.Timestamptz(6)
+  rejectedAt          DateTime?             @map("rejected_at") @db.Timestamptz(6)
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  requester  Employee @relation("MarriageRequester", fields: [requesterEmployeeId], references: [id], onDelete: Restrict)
+  spouse     Employee @relation("MarriageSpouse", fields: [spouseEmployeeId], references: [id], onDelete: Restrict)
+  city       City     @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  reviewedBy User?    @relation("MarriageReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("marriage_requests")
+  @@index([status, submittedAt])
+  @@index([requesterEmployeeId])
+  @@index([spouseEmployeeId])
+  @@index([cityId, status])
+}
+
+// ---------------------------------------------------------------------------
+// AuditLog — immutable change audit trail (append-only)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Uuid
+  actorUserId String      @map("actor_user_id") @db.Uuid
+  action      AuditAction
+  entity      AuditEntity @map("entity_type")
+  entityId    String?     @map("entity_id") @db.Uuid
+  entityLabel String?     @map("entity_label") @db.VarChar(200)
+  beforeValue Json?       @map("before_value")
+  afterValue  Json?       @map("after_value")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@map("audit_logs")
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([entity, createdAt])
+  @@index([createdAt])
+}
