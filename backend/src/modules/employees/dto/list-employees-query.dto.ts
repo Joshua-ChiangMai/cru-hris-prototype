@@ -1,4 +1,3 @@
-import { EmploymentStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -9,6 +8,10 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import {
+  EMPLOYMENT_STATUS_VALUES,
+  type EmploymentStatusValue,
+} from '../../../common/constants/employment-status';
 
 export class ListEmployeesQueryDto {
   @IsOptional()
@@ -33,6 +36,6 @@ export class ListEmployeesQueryDto {
   cityId?: string;
 
   @IsOptional()
-  @IsEnum(EmploymentStatus)
-  employmentStatus?: EmploymentStatus;
+  @IsEnum(EMPLOYMENT_STATUS_VALUES)
+  employmentStatus?: EmploymentStatusValue;
 }

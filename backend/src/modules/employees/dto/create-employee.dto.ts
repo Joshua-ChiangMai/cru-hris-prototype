@@ -7,7 +7,10 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
-import { EmploymentStatus } from '@prisma/client';
+import {
+  EMPLOYMENT_STATUS_VALUES,
+  type EmploymentStatusValue,
+} from '../../../common/constants/employment-status';
 
 export class CreateEmployeeDto {
   @IsString()
@@ -40,8 +43,8 @@ export class CreateEmployeeDto {
   jobTitle?: string;
 
   @IsOptional()
-  @IsEnum(EmploymentStatus)
-  employmentStatus?: EmploymentStatus;
+  @IsEnum(EMPLOYMENT_STATUS_VALUES)
+  employmentStatus?: EmploymentStatusValue;
 
   @IsOptional()
   @IsDateString()

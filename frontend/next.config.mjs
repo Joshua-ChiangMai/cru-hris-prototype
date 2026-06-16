@@ -11,11 +11,7 @@ const nextConfig = {
   experimental: {
     devtoolSegmentExplorer: false,
   },
-  // Standalone output is for production Docker builds only; using it in dev
-  // can corrupt the .next cache and break `next dev`.
-  ...(process.env.NODE_ENV === "production"
-    ? { output: "standalone" }
-    : {}),
+  output: "standalone",
   outputFileTracingRoot: path.join(__dirname, ".."),
 };
 

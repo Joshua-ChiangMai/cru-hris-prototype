@@ -12,6 +12,9 @@ until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d 
 done
 echo "PostgreSQL is ready."
 
+echo "Generating Prisma client..."
+npx prisma generate
+
 echo "Running Prisma migrations..."
 npx prisma migrate deploy
 
