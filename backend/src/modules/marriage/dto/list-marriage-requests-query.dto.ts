@@ -1,6 +1,9 @@
-import { MarriageRequestStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  MARRIAGE_REQUEST_STATUS_VALUES,
+  type MarriageRequestStatusValue,
+} from '../../../common/constants/marriage-request-status';
 
 export class ListMarriageRequestsQueryDto {
   @IsOptional()
@@ -17,8 +20,8 @@ export class ListMarriageRequestsQueryDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsEnum(MarriageRequestStatus)
-  status?: MarriageRequestStatus;
+  @IsIn(MARRIAGE_REQUEST_STATUS_VALUES)
+  status?: MarriageRequestStatusValue;
 
   @IsOptional()
   @Type(() => Boolean)

@@ -21,15 +21,17 @@ RUN npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production
-WORKDIR /app/frontend
+WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/frontend/public ./public
+# Monorepo standalone: .next/standalone/frontend/server.js + root node_modules
+COPY --from=builder /app/frontend/public ./frontend/public
 COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/static ./frontend/.next/static
 
 USER nextjs
+WORKDIR /app/frontend
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0

@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import {
-  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -36,7 +36,7 @@ export class EmployeeReportQueryDto {
   cityId?: string;
 
   @IsOptional()
-  @IsEnum(EMPLOYMENT_STATUS_VALUES)
+  @IsIn(EMPLOYMENT_STATUS_VALUES)
   employmentStatus?: EmploymentStatusValue;
 
   @IsOptional()

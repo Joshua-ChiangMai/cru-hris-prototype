@@ -1,9 +1,12 @@
-import { UpdateRequestType } from '@prisma/client';
-import { IsEnum, IsObject, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
+import {
+  UPDATE_REQUEST_TYPE_VALUES,
+  type UpdateRequestTypeValue,
+} from '../../../common/constants/update-request-type';
 
 export class CreateUpdateRequestDto {
-  @IsEnum(UpdateRequestType)
-  requestType!: UpdateRequestType;
+  @IsIn(UPDATE_REQUEST_TYPE_VALUES)
+  requestType!: UpdateRequestTypeValue;
 
   @IsUUID()
   targetEmployeeId!: string;

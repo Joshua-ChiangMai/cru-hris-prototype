@@ -3,22 +3,38 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { Gender, LanguageProficiency, MaritalStatus, WorkerStatus, WorkerType } from '@prisma/client';
+import { GENDER_VALUES, type GenderValue } from '../../../common/constants/gender';
+import {
+  LANGUAGE_PROFICIENCY_VALUES,
+  type LanguageProficiencyValue,
+} from '../../../common/constants/language-proficiency';
+import {
+  MARITAL_STATUS_VALUES,
+  type MaritalStatusValue,
+} from '../../../common/constants/marital-status';
+import {
+  WORKER_STATUS_VALUES,
+  type WorkerStatusValue,
+} from '../../../common/constants/worker-status';
+import {
+  WORKER_TYPE_VALUES,
+  type WorkerTypeValue,
+} from '../../../common/constants/worker-type';
 
 export class UpdateBasicInfoDto {
   @IsOptional() @IsString() @MaxLength(100) firstName?: string;
   @IsOptional() @IsString() @MaxLength(100) lastName?: string;
   @IsOptional() @IsString() @MaxLength(100) preferredName?: string;
   @IsOptional() @IsDateString() dateOfBirth?: string;
-  @IsOptional() @IsEnum(Gender) gender?: Gender;
-  @IsOptional() @IsEnum(MaritalStatus) maritalStatus?: MaritalStatus;
+  @IsOptional() @IsIn(GENDER_VALUES) gender?: GenderValue;
+  @IsOptional() @IsIn(MARITAL_STATUS_VALUES) maritalStatus?: MaritalStatusValue;
   @IsOptional() @IsString() @MaxLength(80) citizenship?: string;
   @IsOptional() @IsString() @MaxLength(30) rcNumber?: string;
 }
@@ -44,8 +60,8 @@ export class UpdateContactInfoDto {
 }
 
 export class UpdateWorkerInfoDto {
-  @IsOptional() @IsEnum(WorkerType) workerType?: WorkerType;
-  @IsOptional() @IsEnum(WorkerStatus) workerStatus?: WorkerStatus;
+  @IsOptional() @IsIn(WORKER_TYPE_VALUES) workerType?: WorkerTypeValue;
+  @IsOptional() @IsIn(WORKER_STATUS_VALUES) workerStatus?: WorkerStatusValue;
   @IsOptional() @IsDateString() internStartDate?: string;
   @IsOptional() @IsDateString() ministryJoinDate?: string;
   @IsOptional() @IsDateString() workerJoinDate?: string;
@@ -75,7 +91,7 @@ export class EducationItemDto {
 export class LanguageItemDto {
   @IsOptional() @IsString() id?: string;
   @IsString() @MaxLength(80) language!: string;
-  @IsEnum(LanguageProficiency) proficiency!: LanguageProficiency;
+  @IsIn(LANGUAGE_PROFICIENCY_VALUES) proficiency!: LanguageProficiencyValue;
 }
 
 export class PassportItemDto {

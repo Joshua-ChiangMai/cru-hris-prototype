@@ -1,20 +1,23 @@
-import { ApprovalChangeDomain } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  IsEnum,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
 } from 'class-validator';
+import {
+  APPROVAL_CHANGE_DOMAIN_VALUES,
+  type ApprovalChangeDomainValue,
+} from '../../../common/constants/approval-change-domain';
 
 export class SubmitChangeRequestDto {
   @IsUUID()
   targetEmployeeId!: string;
 
-  @IsEnum(ApprovalChangeDomain)
-  changeDomain!: ApprovalChangeDomain;
+  @IsIn(APPROVAL_CHANGE_DOMAIN_VALUES)
+  changeDomain!: ApprovalChangeDomainValue;
 
   @IsObject()
   payloadBefore!: Record<string, unknown>;

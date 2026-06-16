@@ -1,18 +1,22 @@
-import { FamilyRelationship } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
-  IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import {
+  FAMILY_RELATIONSHIP_VALUES,
+  type FamilyRelationshipValue,
+} from '../../../common/constants/family-relationship';
 
 export class FamilyMemberUpdateDto {
   @IsOptional() @IsString() id?: string;
-  @IsEnum(FamilyRelationship) relationshipType!: FamilyRelationship;
+  @IsIn(FAMILY_RELATIONSHIP_VALUES)
+  relationshipType!: FamilyRelationshipValue;
   @IsString() @MaxLength(100) firstName!: string;
   @IsString() @MaxLength(100) lastName!: string;
   @IsOptional() @IsDateString() dateOfBirth?: string;

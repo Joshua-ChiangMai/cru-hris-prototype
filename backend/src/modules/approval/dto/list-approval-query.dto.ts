@@ -1,14 +1,21 @@
-import { ApprovalChangeDomain, UpdateRequestStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsUUID,
   Max,
   Min,
 } from 'class-validator';
+import {
+  APPROVAL_CHANGE_DOMAIN_VALUES,
+  type ApprovalChangeDomainValue,
+} from '../../../common/constants/approval-change-domain';
+import {
+  UPDATE_REQUEST_STATUS_VALUES,
+  type UpdateRequestStatusValue,
+} from '../../../common/constants/update-request-status';
 
 export class ListApprovalQueryDto {
   @IsOptional()
@@ -25,16 +32,16 @@ export class ListApprovalQueryDto {
   limit?: number = 20;
 
   @IsOptional()
-  @IsEnum(UpdateRequestStatus)
-  status?: UpdateRequestStatus;
+  @IsIn(UPDATE_REQUEST_STATUS_VALUES)
+  status?: UpdateRequestStatusValue;
 
   @IsOptional()
   @IsUUID()
   cityId?: string;
 
   @IsOptional()
-  @IsEnum(ApprovalChangeDomain)
-  changeDomain?: ApprovalChangeDomain;
+  @IsIn(APPROVAL_CHANGE_DOMAIN_VALUES)
+  changeDomain?: ApprovalChangeDomainValue;
 
   /** When true, returns only APPROVED, REJECTED, and CANCELLED requests. */
   @IsOptional()

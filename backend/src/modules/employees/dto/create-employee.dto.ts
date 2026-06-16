@@ -1,7 +1,7 @@
 import {
   IsDateString,
   IsEmail,
-  IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -43,7 +43,7 @@ export class CreateEmployeeDto {
   jobTitle?: string;
 
   @IsOptional()
-  @IsEnum(EMPLOYMENT_STATUS_VALUES)
+  @IsIn(EMPLOYMENT_STATUS_VALUES)
   employmentStatus?: EmploymentStatusValue;
 
   @IsOptional()
