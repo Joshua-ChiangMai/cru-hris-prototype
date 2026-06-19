@@ -17,6 +17,13 @@ COPY backend ./backend
 WORKDIR /app/backend
 RUN npx prisma generate
 RUN npm run build
+# Fail the image build if any DTO still compiles to @IsEnum (requires prisma generate at load time).
+RUN if grep -rE 'IsEnum\(' dist/ --include='*.js' 2>/dev/null; then \
+      echo "FATAL: compiled output still uses IsEnum(); rebuild DTOs with @IsIn(CONSTANT_VALUES)" >&2; \
+      exit 1; \
+    fi
+RUN grep -q 'IsIn' dist/modules/employees/dto/create-employee.dto.js \
+    && ! grep -q 'IsEnum' dist/modules/employees/dto/create-employee.dto.js
 
 FROM base AS runner
 ENV NODE_ENV=production
