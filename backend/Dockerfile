@@ -14,8 +14,10 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY backend ./backend
+# Prisma CLI is hoisted to the workspace root, not backend/node_modules.
+WORKDIR /app
+RUN node_modules/.bin/prisma generate --schema=backend/prisma/schema.prisma
 WORKDIR /app/backend
-RUN npx prisma generate
 RUN npm run build
 # Fail the image build if any DTO still compiles to @IsEnum (requires prisma generate at load time).
 RUN if grep -rE 'IsEnum\(' dist/ --include='*.js' 2>/dev/null; then \

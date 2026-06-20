@@ -12,11 +12,14 @@ until pg_isready -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d 
 done
 echo "PostgreSQL is ready."
 
+# Prisma CLI is hoisted to /app/node_modules in the npm workspace layout.
+PRISMA_BIN="/app/node_modules/.bin/prisma"
+
 echo "Generating Prisma client..."
-npx prisma generate
+"$PRISMA_BIN" generate
 
 echo "Running Prisma migrations..."
-npx prisma migrate deploy
+"$PRISMA_BIN" migrate deploy
 
 echo "Starting NestJS application..."
 exec "$@"
