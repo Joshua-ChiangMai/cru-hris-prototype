@@ -204,7 +204,7 @@ export function ApprovalDetailPage({ requestId }: ApprovalDetailPageProps) {
           {request.approvalLogs.map((log) => (
             <li
               key={log.id}
-              className="rounded-md border border-border bg-slate-900/40 px-3 py-2"
+              className="rounded-md border border-border bg-slate-50 px-3 py-2"
             >
               <p className="font-medium">
                 {log.action}

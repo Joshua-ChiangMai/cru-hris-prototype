@@ -69,10 +69,31 @@ export class ApprovalChangeService {
       return;
     }
 
+    const employeeData = this.buildEmployeeUpdateFromPayload(payloadAfter);
     await this.prisma.employee.update({
       where: { id: targetEmployeeId },
-      data: this.buildEmployeeUpdateFromPayload(payloadAfter),
+      data: employeeData,
     });
+
+    if (payloadAfter.phone !== undefined) {
+      const phonePrimary = payloadAfter.phone ? String(payloadAfter.phone) : null;
+      await this.prisma.employeeContactInfo.upsert({
+        where: { employeeId: targetEmployeeId },
+        create: { employeeId: targetEmployeeId, phonePrimary },
+        update: { phonePrimary },
+      });
+    }
+
+    if (payloadAfter.workEmail !== undefined) {
+      const emailPrimary = payloadAfter.workEmail
+        ? String(payloadAfter.workEmail)
+        : null;
+      await this.prisma.employeeContactInfo.upsert({
+        where: { employeeId: targetEmployeeId },
+        create: { employeeId: targetEmployeeId, emailPrimary },
+        update: { emailPrimary },
+      });
+    }
   }
 
   private buildEmployeeUpdateFromPayload(

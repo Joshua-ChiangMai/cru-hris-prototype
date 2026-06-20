@@ -106,7 +106,7 @@ export function EmployeeListPage() {
       </Card>
 
       {error ? (
-        <p className="rounded-md border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       ) : null}

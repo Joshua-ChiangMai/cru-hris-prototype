@@ -36,7 +36,7 @@ export function SidebarNav({ session }: SidebarNavProps) {
                     "block rounded-md px-3 py-2 text-sm transition-colors",
                     active
                       ? "bg-primary text-primaryForeground"
-                      : "text-muted hover:bg-slate-800 hover:text-foreground",
+                      : "text-muted hover:bg-slate-100 hover:text-foreground",
                   )}
                 >
                   {item.label}

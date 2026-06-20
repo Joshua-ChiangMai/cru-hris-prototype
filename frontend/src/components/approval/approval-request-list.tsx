@@ -79,10 +79,10 @@ export function ApprovalRequestList({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    PENDING: "bg-amber-950/50 text-amber-200 border-amber-800",
-    APPROVED: "bg-emerald-950/50 text-emerald-200 border-emerald-800",
-    REJECTED: "bg-red-950/50 text-red-300 border-red-800",
-    CANCELLED: "bg-slate-800 text-slate-300 border-slate-600",
+    PENDING: "bg-amber-50 text-amber-700 border-amber-200",
+    APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    REJECTED: "bg-red-50 text-red-700 border-red-200",
+    CANCELLED: "bg-slate-100 text-slate-600 border-slate-200",
   };
 
   return (

@@ -174,7 +174,7 @@ export function ProfilePage({
                 "w-full rounded-md px-3 py-2 text-left text-sm transition-colors",
                 activeSection === item.id
                   ? "bg-primary text-primaryForeground"
-                  : "text-muted hover:bg-slate-800 hover:text-foreground",
+                  : "text-muted hover:bg-slate-100 hover:text-foreground",
               )}
             >
               {item.label}
@@ -197,7 +197,7 @@ export function ProfilePage({
           </div>
 
           {error && (
-            <p className="mb-3 rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-300">
+            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </p>
           )}

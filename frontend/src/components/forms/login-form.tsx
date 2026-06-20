@@ -48,7 +48,7 @@ export function LoginForm() {
       </p>
       <form className="space-y-4" onSubmit={onSubmit}>
         {error ? (
-          <p className="rounded-md border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         ) : null}
@@ -84,7 +84,8 @@ export function LoginForm() {
           {isSubmitting ? "Signing in..." : "Sign In"}
         </Button>
         <p className="text-xs text-muted">
-          Demo: admin@hris.local / hr@hris.local / staff@hris.local — Password123!
+          Demo accounts (Password123!): admin@hris.local, hr1@hris.local,
+          hr2@hris.local, hr3@hris.local, staff1@hris.local
         </p>
       </form>
     </Card>

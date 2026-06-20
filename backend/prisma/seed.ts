@@ -684,6 +684,24 @@ async function seedApprovals(
           workEmail: after.workEmail ? String(after.workEmail) : target.workEmail,
         },
       });
+
+      if (after.phone !== undefined) {
+        const phonePrimary = after.phone ? String(after.phone) : null;
+        await prisma.employeeContactInfo.upsert({
+          where: { employeeId: target.id },
+          create: { employeeId: target.id, phonePrimary },
+          update: { phonePrimary },
+        });
+      }
+
+      if (after.workEmail !== undefined) {
+        const emailPrimary = after.workEmail ? String(after.workEmail) : null;
+        await prisma.employeeContactInfo.upsert({
+          where: { employeeId: target.id },
+          create: { employeeId: target.id, emailPrimary },
+          update: { emailPrimary },
+        });
+      }
     }
 
     if (scenario.status === UpdateRequestStatus.REJECTED && approver) {
