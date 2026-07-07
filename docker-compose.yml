@@ -30,8 +30,7 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     expose:
       - "3001"
     labels:
