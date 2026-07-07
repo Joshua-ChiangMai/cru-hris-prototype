@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: hris_p0_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -29,11 +28,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: hris_p0_backend
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+    expose:
+      - "3001"
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${BACKEND_PORT:-3001}
@@ -52,10 +52,11 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
-    container_name: hris_p0_frontend
     restart: unless-stopped
     depends_on:
       - backend
+    expose:
+      - "3000"
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
